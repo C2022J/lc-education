@@ -1,0 +1,36 @@
+[project]
+name = "backend"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.136.1",
+    "google-genai>=1.74.0",
+    "langchain-chroma>=1.1.0",
+    "langchain-google-genai>=4.2.2",
+    "langchain-huggingface>=1.2.2",
+    "langchain-openai>=1.2.1",
+    "langchain-tavily>=0.2.18",
+    "langgraph>=1.1.10",
+    "python-multipart>=0.0.27",
+    "sentence-transformers>=5.4.1",
+    "torch==2.4.1+cu121",
+    "torchaudio==2.4.1",
+    "torchvision==0.19.1+cu121",
+    "transformers<4.46.0",
+]
+[tool.uv.sources]
+torch = { index = "pytorch" }
+torchvision = { index = "pytorch" }
+torchaudio = { index = "pytorch" }
+
+[[tool.uv.index]]
+name = "pytorch"
+url = "https://download.pytorch.org/whl/cu121"
+explicit = true
+
+[[tool.uv.index]]
+name = "tsinghua"
+url = "https://mirrors.tuna.tsinghua.edu.cn/pytorch-wheels/cu121"
+explicit = true

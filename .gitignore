@@ -1,0 +1,34 @@
+# ===== 环境与密钥 =====
+.env
+*.env.*
+!*.env.example
+
+# ===== Python =====
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+*.egg-info/
+
+# ===== 本地大模型文件（体积过大，不入库） =====
+backend/models/
+
+# ===== 运行时产生的数据目录 =====
+backend/uploads/
+backend/outputs/
+backend/archived_pdfs/
+backend/local_chroma_db/
+
+# ===== 前端依赖 =====
+frontend/node_modules/
+frontend/dist/
+
+# ===== IDE & 工具配置 =====
+.vscode/
+.idea/
+.claude/
+
+# ===== 系统文件 =====
+.DS_Store
+Thumbs.db

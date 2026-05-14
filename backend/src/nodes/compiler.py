@@ -1,168 +1,390 @@
-from typing import Dict, Any
-import json
+# src/nodes/compiler.py
+"""
+Python-based exam paper renderer + LaTeX compiler.
+Deterministic layout: no LLM for formatting — only for keyword extraction.
+"""
+import re
 import uuid
 import asyncio
+import subprocess
+from pathlib import Path
+from collections import defaultdict
 
 from langchain_openai import ChatOpenAI
-from langchain.agents import create_agent
+from langchain_core.messages import SystemMessage, HumanMessage
 
 from src.config.settings import settings
 from src.schemas.graph_state import SelectionState
-from src.tools.latex_compiler import compile_latex_to_pdf
+from src.tools.latex_compiler import PREAMBLE_A4, PREAMBLE_EXAM
 
-# LaTeX 排版是纯文本代码生成任务，DeepSeek 擅长且便宜
 compiler_llm = ChatOpenAI(
     model=settings.MODEL_FAST,
     api_key=settings.DEEPSEEK_API_KEY,
     base_url=settings.DEEPSEEK_API_BASE,
-    temperature=0.1,
+    temperature=0.0,
 )
 
-COMPILER_SYSTEM_PROMPT = """
-你是一个顶级的数学 LaTeX 排版工程师。
-你将接收到一份结构化的试题 JSON 数据。
+BASE_DIR = Path(__file__).parent.parent.parent.resolve()
 
-【核心守则】
-1. 你的任务是生成 LaTeX **正文部分**的代码，并且【必须且只能】通过调用 `compile_latex_to_pdf` 工具来输出！绝不能在文字回复中直接把大段代码打印给我！
-2. **严禁**输出 `\\documentclass`, `\\usepackage`, `\\begin{document}`, `\\end{document}`！系统已经为你配置好了完美的编译环境，你如果输出这些会导致灾难性的编译错误！
-3. 如果工具返回 ERROR，仔细阅读报错信息（通常是少了一个 `$` 或者 `{` 没闭合），在脑海中修复代码后再次调用工具，直到成功！
 
-【题型判断规则】
-1. 如果 `options` 数组不为空 -> 「选择题」。
-2. 题干包含“证明”、“解答”、“求”等字眼且 `options` 为空 -> 「解答题」。
-3. 否则 -> 「填空题」。
+# ══════════════════════════════════════════════════════════════════════════════
+# Text pre-processing
+# ══════════════════════════════════════════════════════════════════════════════
 
-【正文排版模板库】（严格套用）
+def _strip_label(text: str) -> str:
+    """Remove original KB labels and leading question numbers from text."""
+    # Strip 【...】 at the very start: 【例2】, 【变式训练1】, 【随堂练习1】 etc.
+    text = re.sub(r'^\s*【[^】]{1,30}】\s*', '', text)
+    # Strip leading number+delimiter like "6. " or "（3）" or "3、" or "5.（..."
+    # \s* (not \s+) so the pattern matches even when no space follows the delimiter
+    text = re.sub(r'^\s*[\(（]?\d{1,3}[\)）\.、]\s*', '', text)
+    return text.strip()
 
-▶ 选择题模板 (如果有图片路径，请用 \\begin{flushright}\\includegraphics[width=0.4\\textwidth]{路径}\\end{flushright} 包裹)
-\\noindent \\textbf{{{题号}.}} {题干文本}
-\\vspace{0.2cm}
-\\noindent \\makebox[0.25\\linewidth][l]{A. {选项1}} \\makebox[0.25\\linewidth][l]{B. {选项2}} \\makebox[0.25\\linewidth][l]{C. {选项3}} \\makebox[0.25\\linewidth][l]{D. {选项4}}
-% 如果是学生卷，追加留白: \\vspace{1.5cm}
-% 如果是解析卷，追加解析: \\vspace{0.5cm} \\textbf{【解析】} {解析内容} \\vspace{1cm}
 
-▶ 填空题模板
-\\noindent \\textbf{{{题号}.}} {题干文本}
-% 学生卷追加: \\vspace{2.5cm}
-% 解析卷追加: \\vspace{0.5cm} \\textbf{【解析】} {解析内容} \\vspace{1cm}
+_UNICODE_SUBS = [
+    ('★', r'$\star$'),
+    ('☆', r'$\star$'),
+    ('●', r'$\bullet$'),
+    ('○', r'（\hspace{0.5cm}）'),   # fill-in blank circle — \hspace works in text mode
+    ('△', r'$\triangle$'),
+    ('∘', r'$\circ$'),
+    ('•', r'\textbullet{}'),
+    ('…', r'\ldots{}'),
+    ('·', r'\ensuremath{\cdot}'),  # \ensuremath works in both text and math mode
+]
 
-▶ 解答/证明题模板
-\\noindent \\textbf{{{题号}.}} {题干文本}
-% 学生卷追加: \\vspace{8cm}
-% 解析卷追加: \\vspace{0.5cm} \\textbf{【解析】} {解析内容} \\vspace{1cm}
+def _fix_unicode(text: str) -> str:
+    """Replace unsupported Unicode characters with LaTeX equivalents."""
+    for char, sub in _UNICODE_SUBS:
+        text = text.replace(char, sub)
+    return text
+
+
+def _md_to_latex(text: str) -> str:
+    """Convert minimal Markdown markup to LaTeX equivalents."""
+    # Bold **text** → \textbf{text}
+    text = re.sub(r'\*\*(.+?)\*\*', r'\\textbf{\1}', text)
+    # Normalize fill-in blanks: 4+ underscores (raw or escaped) → \underline
+    text = re.sub(r'(?:\\_){3,}', r'\\underline{\\hspace{3cm}}', text)
+    text = re.sub(r'_{4,}', r'\\underline{\\hspace{3cm}}', text)
+    # Widen answer slot: （）→ （\hspace{1.5em}） so students have room to write
+    text = text.replace('（）', r'（\hspace{1.5em}）')
+    return text
+
+
+def _process_images(text: str) -> str:
+    """Rewrite Markdown image links to \\includegraphics, right-aligned after all text.
+
+    All image links are stripped from their inline positions and collected;
+    they are then appended as a right-aligned block after the full text so the
+    question stem always reads complete before any figure appears.
+    """
+    collected: list[str] = []
+
+    def replace_img(m):
+        alt = m.group(1)
+        url = m.group(2)
+        print(f'  [IMG] 发现图片 alt={repr(alt)}  url={repr(url)}')
+        img_filename = Path(url).name
+        abs_path = BASE_DIR / 'assets' / 'images' / img_filename
+        exists = abs_path.exists()
+        print(f'  [IMG] 映射到: {abs_path}  文件存在: {exists}')
+        if exists:
+            latex_path = str(abs_path).replace('\\', '/')
+            collected.append(
+                '\\begin{flushright}'
+                f'\\includegraphics[width=0.30\\textwidth]{{{latex_path}}}'
+                '\\end{flushright}'
+            )
+        else:
+            print(f'  [IMG] ⚠️ 文件不存在，跳过')
+        return ''  # 从行内位置移除，统一追加到末尾
+
+    clean_text = re.sub(r'!\[(.*?)\]\(([^)]+)\)', replace_img, text).strip()
+
+    if collected:
+        img_block = '\n\n' + '\n'.join(collected)
+        return clean_text + img_block
+    return clean_text
+
+
+def _clean(text: str) -> str:
+    """Full cleaning pipeline: strip labels → unicode → markdown → images."""
+    text = _strip_label(text)
+    text = _fix_unicode(text)
+    text = _md_to_latex(text)
+    text = _process_images(text)
+    return text.strip()
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Question type detection
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _detect_type(question_text: str, options) -> str:
+    if options:
+        if '多选' in question_text or '多项' in question_text:
+            return '多选'
+        return '单选'
+    if re.search(r'_{2,}|＿{2,}|____', question_text):
+        return '填空'
+    return '解答'
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Option layout (adaptive: 4 / 2 / 1 per row)
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _est_width(opt: str) -> int:
+    """Estimate rendered character width for option layout decisions."""
+    # Unwrap $math$ — keep the math content for length estimation
+    s = re.sub(r'\$([^$]+)\$', r'\1', opt)
+    # \frac{a}{b} → ab (fraction height ≠ width)
+    s = re.sub(r'\\frac\{([^}]*)\}\{([^}]*)\}', r'\1\2', s)
+    # Other \cmd{content} → content
+    s = re.sub(r'\\[a-zA-Z]+\{([^}]*)\}', r'\1', s)
+    # Bare \cmd → nothing
+    s = re.sub(r'\\[a-zA-Z]+', '', s)
+    # Strip braces, superscripts, subscripts
+    s = re.sub(r'[\{\}\^_]', '', s)
+    return len(s)
+
+
+def _option_lines(options: list) -> str:
+    if not options:
+        return ''
+    labels = ['A', 'B', 'C', 'D', 'E']
+    # Strip any existing A./B./C./D. label already present in the option text
+    cleaned = [re.sub(r'^[A-Ea-e][.、]\s*', '', opt) for opt in options]
+    max_w = max(_est_width(opt) for opt in cleaned)
+
+    if max_w <= 10:
+        cols, box = 4, '0.24'
+    elif max_w <= 22:
+        cols, box = 2, '0.48'
+    else:
+        cols, box = 1, '0.97'
+
+    items = [f'{labels[i]}. {cleaned[i]}' for i in range(min(len(cleaned), 4))]
+    rows = []
+    for i in range(0, len(items), cols):
+        chunk = items[i:i + cols]
+        cells = ' '.join(f'\\makebox[{box}\\linewidth][l]{{{c}}}' for c in chunk)
+        rows.append(f'\\noindent {cells}')
+    return '\n'.join(rows)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# LaTeX body renderer
+# ══════════════════════════════════════════════════════════════════════════════
+
+TYPE_ORDER = ['单选', '多选', '填空', '解答']
+TYPE_HEADERS = {
+    '单选': '一、单选题',
+    '多选': '二、多选题',
+    '填空': '三、填空题',
+    '解答': '四、解答题',
+}
+STUDENT_SPACE = {'单选': '1.0cm', '多选': '1.0cm', '填空': '2.5cm', '解答': '8cm'}
+
+
+def render_exam_body(questions, title: str, is_teacher: bool) -> str:
+    """Render the full LaTeX body for student or teacher version."""
+    groups = defaultdict(list)
+    for q in questions:
+        qt = _detect_type(
+            getattr(q, 'question_text', ''),
+            getattr(q, 'options', None) or [],
+        )
+        groups[qt].append(q)
+
+    lines = [
+        f'\\begin{{center}} \\Large \\textbf{{{title} --- 智能专项练习}} \\end{{center}}',
+        '\\vspace{0.6cm}',
+        '',
+    ]
+
+    global_num = 1
+    for qt in TYPE_ORDER:
+        if qt not in groups:
+            continue
+
+        header = TYPE_HEADERS[qt]
+        lines += [
+            '\\vspace{0.4cm}',
+            f'\\noindent{{\\large\\textbf{{{header}}}}}',
+            '\\vspace{0.25cm}',
+            '',
+        ]
+
+        for q in groups[qt]:
+            q_text = _clean(getattr(q, 'question_text', ''))
+            opts = getattr(q, 'options', None) or []
+            answer = getattr(q, 'answer', '')
+
+            # Question stem
+            lines.append(f'\\noindent \\textbf{{{global_num}.}} {q_text}')
+
+            # Options (choice questions) — blank line ends the paragraph so
+            # options always start on a new line rather than trailing the stem.
+            if opts:
+                lines.append('')   # \n\n = paragraph break in LaTeX
+                lines.append(_option_lines(opts))
+
+            # Student blank / teacher solution
+            if is_teacher:
+                answer_tex = _clean(answer)
+                lines += [
+                    '\\vspace{0.3cm}',
+                    f'\\noindent\\textbf{{【解析】}} {answer_tex}',
+                    '\\vspace{0.8cm}',
+                    '',
+                ]
+            else:
+                space = STUDENT_SPACE.get(qt, '3cm')
+                if qt in ('单选', '多选'):
+                    lines += ['\\vspace{0.4cm}', '']
+                else:
+                    lines += [f'\\vspace{{{space}}}', '']
+
+            global_num += 1
+
+    return '\n'.join(lines)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# LLM polishing (validates & fixes LaTeX before compilation)
+# ══════════════════════════════════════════════════════════════════════════════
+
+_POLISH_PROMPT = """\
+你是 LaTeX 数学排版修复专家。你将收到一段试卷的 LaTeX 正文代码，请检查并修复以下问题，使其能被 xelatex 正确编译：
+
+【必须修复】
+1. \\left / \\right 配对：确保每个 $...$ 块内 \\left 与 \\right 数量对应，修复孤立的 \\left 或 \\right
+2. $ 配对：确保所有数学模式 $...$ 正确闭合
+3. 填空横线：将 \\underline{\\hspace{3cm}} 正确保留；若发现裸露的 ____ 替换为 \\underline{\\hspace{3cm}}
+4. 确认已无 ★ ☆ ● ○ 等 Unicode 字符
+
+【严格禁止】
+- 不得修改题目数学内容、公式含义、答案数值
+- 不得修改 \\noindent、\\textbf、\\vspace、\\makebox 等结构命令
+- 不得添加 \\documentclass、\\begin{document} 等导言区内容
+- 不得重新排版或重写题目
+
+直接输出修复后的 LaTeX 正文代码，不要有任何解释、注释或代码块标记（不要加 ```latex）。\
 """
 
-tools = [compile_latex_to_pdf]
 
-# 注意：去掉了这里的全局 agent_executor
+def _polish_latex_sync(body: str) -> str:
+    """Ask the LLM to validate and fix the LaTeX body (synchronous, runs in thread)."""
+    try:
+        resp = compiler_llm.invoke([
+            SystemMessage(content=_POLISH_PROMPT),
+            HumanMessage(content=body),
+        ])
+        result = resp.content.strip()
+        # Strip markdown fences if the LLM adds them despite instructions
+        result = re.sub(r'^```(?:latex|tex)?\s*', '', result, flags=re.MULTILINE)
+        result = re.sub(r'\s*```\s*$', '', result, flags=re.MULTILINE)
+        return result.strip() or body          # fall back to original if empty
+    except Exception as e:
+        print(f'  ⚠️ LLM 精修失败: {e}，使用 Python 渲染原稿')
+        return body
 
-async def trigger_agent_compilation(role_type: str, target_path: str, title: str, json_payload: str, is_teacher: bool = False) -> str:
-    """
-    异步驱动单个 Agent 生成指定版本的卷子。
-    返回大模型的最终文本回复（用于提取关键字）。
-    """
-    print(f"\n  🚀 [并发启动] 唤醒独立 Agent 负责: {role_type} -> {target_path}")
-    
-    # 【核心修复】：为每一个并发任务创建一个完全独立的 Agent 实例，防止状态污染！
-    local_agent = create_agent(
-        model=compiler_llm,
-        tools=tools,
-        system_prompt=COMPILER_SYSTEM_PROMPT
-    )
-    
-    user_instruction = f"""
-    请生成【{role_type}】版本的试卷正文。
-    请在正文开头插入标题代码：\\begin{{center}} \\Large \\textbf{{{title} - 智能专项练习}} \\end{{center}} \\vspace{{0.5cm}}
-    
-    试题 JSON 数据：
-    {json_payload}
-    
-    编译目标路径：{target_path}
-    """
-    
-    if is_teacher:
-        user_instruction += "\n\n在成功调用编译工具生成 PDF 后，请根据题干内容提取 2-3 个核心关键词（格式如：三角函数_高考真题），作为你的最终文字回复！除关键词外不要说废话。"
-        
-    final_reply = ""
+
+# ══════════════════════════════════════════════════════════════════════════════
+# LaTeX compilation
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _compile_sync(body: str, pdf_name: str, preamble: str) -> bool:
+    """Write and compile a .tex file to PDF (blocking, runs in thread)."""
+    outputs_dir = BASE_DIR / 'outputs'
+    outputs_dir.mkdir(parents=True, exist_ok=True)
+
+    tex_name = pdf_name.replace('.pdf', '.tex')
+    tex_path = outputs_dir / Path(tex_name).name
+    pdf_path = outputs_dir / Path(pdf_name).name
+
+    full_tex = preamble + '\n' + body + '\n\\end{document}\n'
+    tex_path.write_text(full_tex, encoding='utf-8')
 
     try:
-        # 使用独立的 local_agent 进行流式执行
-        async for chunk in local_agent.astream({"messages": [("user", user_instruction)]}):
-            if "agent" in chunk:
-                for msg in chunk["agent"]["messages"]:
-                    if hasattr(msg, "tool_calls") and msg.tool_calls:
-                        for tc in msg.tool_calls:
-                            pdf_name = tc.get("args", {}).get("output_pdf_name", "未知文件")
-                            print(f"  [{role_type}] 🛠️ 正文拼装完毕，注入模板并启动编译 -> {pdf_name}")
-                    elif msg.content:
-                        final_reply = msg.content.strip()
-                        print(f"  [{role_type} 思考/回复] 📝 {final_reply[:100]}...")
-            elif "tools" in chunk:
-                for msg in chunk["tools"]["messages"]:
-                    content = msg.content
-                    if "ERROR:" in content:
-                        print(f"  [{role_type} 报错] ❌ 捕获到底层 LaTeX 错误！日志已返还，正在自动修复...")
-                        error_preview = content.replace('\n', ' ')[:150]
-                        print(f"  [{role_type} 日志] {error_preview} ...")
-                    elif "SUCCESS" in content:
-                        print(f"  [{role_type} 成功] ✅ 物理 PDF 文件生成落地！")
-    except Exception as e:
-        print(f"  [{role_type}] ❌ Agent 编译失败: {type(e).__name__}: {e}")
+        subprocess.run(
+            ['xelatex', '-interaction=nonstopmode', '-halt-on-error',
+             f'-output-directory={outputs_dir}', str(tex_path)],
+            check=True, capture_output=True, text=True, encoding='utf-8',
+        )
+        print(f'  ✅ PDF 生成: {pdf_path.name}')
+        return True
+    except subprocess.CalledProcessError as e:
+        print(f'  ❌ LaTeX 编译失败:\n{e.stdout[-800:]}')
+        return False
 
-    return final_reply
 
-async def compile_pdf_node(state: SelectionState) -> Dict[str, Any]:
-    print("\n" + "=" * 50)
-    print("⏳ [Node 4] 双引擎排版节点启动，进入异步并发模式...")
+def _extract_keywords_sync(questions, topic: str) -> str:
+    """Synchronous keyword extraction via LLM (runs in thread)."""
+    try:
+        sample = ' '.join(
+            getattr(q, 'question_text', '')[:80] for q in questions[:3]
+        )
+        resp = compiler_llm.invoke([
+            SystemMessage(content='你是关键词提取助手，直接输出2-3个关键词用下划线连接，无需其他文字。例如：三角函数_诱导公式'),
+            HumanMessage(content=f'知识点：{topic}\n题目摘要：{sample}'),
+        ])
+        kw = resp.content.strip().replace(' ', '_')
+        kw = re.sub(r'[关键词：:\s]+', '', kw)
+        return kw if kw and len(kw) <= 20 else topic.replace(' ', '_')[:10]
+    except Exception:
+        return topic.replace(' ', '_')[:10]
 
-    questions = state.get("validated_questions", [])
-    req = state.get("requirement", {})
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Node entry point
+# ══════════════════════════════════════════════════════════════════════════════
+
+async def compile_pdf_node(state: SelectionState) -> dict:
+    print('\n' + '=' * 50)
+    print('⏳ [Node 4] Python 排版引擎启动...')
+
+    questions = state.get('validated_questions', [])
+    req = state.get('requirement', {})
 
     if not questions:
-        print("⚠️ [Node 4] 没有合法题目可供编译。")
+        print('⚠️ [Node 4] 没有合法题目可供编译。')
         return {}
 
-    title = req.get("topic", "综合数学")
+    title = req.get('topic', '综合数学')
     task_id = uuid.uuid4().hex[:8]
-    
-    student_pdf_path = f"outputs/student_{task_id}.pdf"
-    teacher_pdf_path = f"outputs/teacher_{task_id}.pdf"
+    student_name = f'student_{task_id}.pdf'
+    teacher_name = f'teacher_{task_id}.pdf'
 
-    questions_data = [{"question_text": getattr(q, "question_text", ""), "options": getattr(q, "options", []), "answer": getattr(q, "answer", "")} for q in questions]
-    json_payload = json.dumps(questions_data, ensure_ascii=False, indent=2)
+    # Phase 1: Python renders structure (label stripping, grouping, option layout)
+    student_body = render_exam_body(questions, title, is_teacher=False)
+    teacher_body = render_exam_body(questions, title, is_teacher=True)
+    print(f'  📝 Python 排版完成：学生卷 {len(student_body)} 字符，解析卷 {len(teacher_body)} 字符')
 
-    # 并发执行两路 Agent (此时内部各自持有独立的 Agent 实例，互不干扰)
-    student_task = trigger_agent_compilation("学生卷", student_pdf_path, title, json_payload, is_teacher=False)
-    teacher_task = trigger_agent_compilation("解析卷", teacher_pdf_path, title, json_payload, is_teacher=True)
-    
-    print("  ⚡ [性能优化] 学生卷与解析卷已同时派发，火力全开编译中...")
+    # Phase 2: LLM polishing — fix \left/\right, $ balance, Unicode (concurrent)
+    print('  🔧 LLM 精修中...')
+    student_polished, teacher_polished = await asyncio.gather(
+        asyncio.to_thread(_polish_latex_sync, student_body),
+        asyncio.to_thread(_polish_latex_sync, teacher_body),
+    )
+    print(f'  ✅ 精修完成：学生卷 {len(student_polished)} 字符，解析卷 {len(teacher_polished)} 字符')
 
-    # return_exceptions=True 确保一路失败不会拖垮另一路
-    results = await asyncio.gather(student_task, teacher_task, return_exceptions=True)
-    _, teacher_result = results
+    # Phase 3: Compile both PDFs + extract keywords concurrently
+    ok_s, ok_t, keywords = await asyncio.gather(
+        asyncio.to_thread(_compile_sync, student_polished, student_name, PREAMBLE_A4),
+        asyncio.to_thread(_compile_sync, teacher_polished, teacher_name, PREAMBLE_A4),
+        asyncio.to_thread(_extract_keywords_sync, questions, title),
+    )
 
-    print(f"\n✅ [Node 4] 双路并发编译结束！")
+    print(f'✅ [Node 4] 编译完成！学生卷: {"✓" if ok_s else "✗"}  解析卷: {"✓" if ok_t else "✗"}  关键词: {keywords}')
 
-    if isinstance(teacher_result, Exception):
-        print(f"⚠️ [Node 4] 解析卷编译异常: {teacher_result}")
-        teacher_reply = ""
-    else:
-        teacher_reply = teacher_result or ""
-
-    # 清理关键字
-    keywords = teacher_reply.replace("关键词：", "").replace("关键词:", "").strip('"\'* ')
-    if not keywords or len(keywords) > 20: 
-        keywords = title.replace(" ", "_")[:10]
-        
-    download_name_student = f"{keywords}_智能专项练习_学生卷.pdf"
-    download_name_teacher = f"{keywords}_智能专项练习_解析卷.pdf"
-    
-    result = {
-        "review_feedback": "试卷编译并保存成功",
-        "final_student_pdf_url": f"/{student_pdf_path}",
-        "final_teacher_pdf_url": f"/{teacher_pdf_path}",
-        "display_title": title,
-        "download_name_student": download_name_student,
-        "download_name_teacher": download_name_teacher
+    return {
+        'review_feedback': '试卷编译并保存成功',
+        'final_student_pdf_url': f'/outputs/{student_name}',
+        'final_teacher_pdf_url': f'/outputs/{teacher_name}',
+        'display_title': title,
+        'download_name_student': f'{keywords}_智能专项练习_学生卷.pdf',
+        'download_name_teacher': f'{keywords}_智能专项练习_解析卷.pdf',
     }
-    return result

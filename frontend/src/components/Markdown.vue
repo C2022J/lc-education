@@ -24,8 +24,10 @@ const html = computed(() => {
 </template>
 
 <style>
-/* 简单的排版美化 */
-.markdown-content p { margin: 0.5em 0; }
-.markdown-content pre { background: #f3f4f6; padding: 0.5rem; border-radius: 0.5rem; overflow-x: auto; }
-.markdown-content code { background: #f3f4f6; padding: 0.1rem 0.3rem; border-radius: 0.25rem; font-family: monospace; }
+.markdown-content p { margin: 0.4em 0; line-height: 1.6; }
+.markdown-content pre { background: #1a1a26; border: 1px solid #26263a; padding: 0.6rem; border-radius: 0.5rem; overflow-x: auto; }
+.markdown-content code { background: #1e1e2c; color: #c4b5fd; padding: 0.1rem 0.4rem; border-radius: 0.3rem; font-family: 'JetBrains Mono', monospace; font-size: 0.85em; }
+.markdown-content strong { color: #e2e2f0; }
+.markdown-content ul, .markdown-content ol { padding-left: 1.4em; margin: 0.4em 0; }
+.markdown-content li { margin: 0.2em 0; }
 </style>

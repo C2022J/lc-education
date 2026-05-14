@@ -3,7 +3,6 @@ import asyncio
 from typing import Dict, Any
 
 from src.schemas.graph_state import SelectionState
-from src.tools.web_search import execute_web_search
 from src.tools.rag_search import execute_rag_search
 
 
@@ -26,21 +25,7 @@ async def retrieve_candidates_node(state: SelectionState) -> Dict[str, Any]:
     # 给 RAG 使用的合并搜索词
     search_query = f"{topic} {constraints}"
 
-    # 并发任务池
-    tasks = []
-
-    # 1. 挂载本地 RAG 任务
-    tasks.append(execute_rag_search(query=search_query, top_k=count))
-
-    # 2. 挂载公网搜题任务
-    from src.config.settings import settings
-    if settings.TAVILY_API_KEY:
-        # 【修复点】：老老实实把 3 个参数 (topic, constraints, count) 传给 web_search
-        tasks.append(asyncio.to_thread(execute_web_search, topic, constraints, count))
-    else:
-        print("⚠️ [Web Search] 未配置 TAVILY_API_KEY，跳过公网检索。")
-
-    # 3. 轰油门，并发执行！
+    tasks = [execute_rag_search(query=search_query, top_k=count * 3)]
     results = await asyncio.gather(*tasks)
 
     # 合并所有的“生肉”材料 (扁平化 list of lists)
@@ -66,10 +51,11 @@ async def retrieve_candidates_node(state: SelectionState) -> Dict[str, Any]:
             print(f"   图片链接列表:")
             for img_idx, img_link in enumerate(img_links, 1):
                 print(f"      [{img_idx}] {img_link}")
-        
-        # 显示内容预览
-        preview = candidate[:200] + "..." if len(candidate) > 200 else candidate
-        print(f"   内容预览: {preview}")
+
+        # 完整内容
+        print(f"   ── 完整内容 ──")
+        print(candidate)
+        print(f"   ── 内容结束 ──")
         print(f"└─")
         print()
 

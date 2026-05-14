@@ -1,0 +1,1090 @@
+<!doctype html>
+<html lang="zh-CN">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>单位圆与三角函数</title>
+		<link
+			href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@300;400;600;700&family=Lora:ital,wght@0,400;0,600;1,400;1,600&display=swap"
+			rel="stylesheet"
+		/>
+		<style>
+			:root {
+				--bg: #0f1419;
+				--surface: #161b22;
+				--border: #21262d;
+				--border2: #30363d;
+				--tx: #e6edf3;
+				--mu: #8b949e;
+				--sc: #22c55e;
+				--cc: #f59e0b;
+				--pc: #fbbf24;
+			}
+			* {
+				margin: 0;
+				padding: 0;
+				box-sizing: border-box;
+			}
+			body {
+				background: var(--bg);
+				color: var(--tx);
+				font-family: "Noto Serif SC", serif;
+				min-height: 100vh;
+				display: flex;
+				flex-direction: column;
+				align-items: center;
+				padding-bottom: 32px;
+			}
+			header {
+				width: 100%;
+				text-align: center;
+				padding: 18px 16px 10px;
+				border-bottom: 1px solid var(--border);
+			}
+			header h1 {
+				font-family: "Lora", serif;
+				font-size: clamp(1.1rem, 2.2vw, 1.65rem);
+				font-weight: 600;
+				letter-spacing: 0.03em;
+			}
+			header h1 .hs {
+				color: var(--sc);
+				font-style: italic;
+			}
+			header h1 .hc {
+				color: var(--cc);
+				font-style: italic;
+			}
+			header p {
+				margin-top: 4px;
+				font-size: 0.76rem;
+				color: var(--mu);
+				letter-spacing: 0.09em;
+			}
+			/* Full-width canvas, no side padding */
+			.cw {
+				width: 100%;
+				padding: 14px 0 0;
+			}
+			#cv {
+				display: block;
+				width: 100%;
+				background: var(--surface);
+				border-top: 1px solid var(--border);
+				border-bottom: 1px solid var(--border);
+				cursor: default;
+				touch-action: none;
+			}
+			/* Def panel – centered, max readable width */
+			.dp {
+				display: grid;
+				grid-template-columns: 1fr 1fr;
+				gap: 12px;
+				width: calc(100% - 32px);
+				max-width: 1100px;
+				padding: 14px 0 0;
+				margin: 0 auto;
+			}
+			.dc {
+				background: var(--surface);
+				border: 1px solid var(--border2);
+				border-radius: 10px;
+				padding: 14px 18px;
+				position: relative;
+				overflow: hidden;
+			}
+			.dc::before {
+				content: "";
+				position: absolute;
+				left: 0;
+				top: 0;
+				bottom: 0;
+				width: 4px;
+			}
+			.dc.ds::before {
+				background: var(--sc);
+			}
+			.dc.dcc::before {
+				background: var(--cc);
+			}
+			.dct {
+				font-size: 0.78rem;
+				letter-spacing: 0.1em;
+				color: var(--mu);
+				text-transform: uppercase;
+				margin-bottom: 10px;
+			}
+			.dcf {
+				font-family: "Lora", serif;
+				font-size: clamp(1.05rem, 2.2vw, 1.35rem);
+				line-height: 2.6;
+				margin-bottom: 10px;
+			}
+			.dcf .hy {
+				color: var(--sc);
+				font-weight: 700;
+				font-style: italic;
+			}
+			.dcf .hx {
+				color: var(--cc);
+				font-weight: 700;
+				font-style: italic;
+			}
+			/* Real fraction display */
+			.fr {
+				display: inline-flex;
+				flex-direction: column;
+				align-items: center;
+				vertical-align: middle;
+				line-height: 1.15;
+				margin: 0 4px;
+				font-family: "Lora", serif;
+			}
+			.fr .fn {
+				border-bottom: 2px solid currentColor;
+				padding: 0 7px 3px;
+				font-style: italic;
+				font-weight: 700;
+			}
+			.fr .fd {
+				padding: 3px 7px 0;
+				font-style: normal;
+				font-weight: 400;
+			}
+			.fr.hy {
+				color: var(--sc);
+			}
+			.fr.hx {
+				color: var(--cc);
+			}
+			.dcl {
+				font-family: "Lora", serif;
+				font-size: clamp(1.1rem, 2.4vw, 1.45rem);
+				display: flex;
+				align-items: baseline;
+				gap: 8px;
+				margin-top: 4px;
+			}
+			.dcll {
+				font-size: clamp(1.25rem, 2.8vw, 1.65rem);
+			}
+			.dclv {
+				font-weight: 700;
+				font-size: clamp(1.25rem, 2.8vw, 1.65rem);
+			}
+			.ds .dcll, .ds .dclv {
+				color: var(--sc);
+			}
+			.dcc .dcll, .dcc .dclv {
+				color: var(--cc);
+			}
+			/* Info bar */
+			.ib {
+				display: flex;
+				gap: 22px;
+				flex-wrap: wrap;
+				align-items: center;
+				justify-content: center;
+				margin: 12px auto 0;
+				padding: 10px 24px;
+				background: var(--surface);
+				border: 1px solid var(--border);
+				border-radius: 10px;
+				width: calc(100% - 32px);
+				max-width: 780px;
+				font-family: "Lora", serif;
+			}
+			.is {
+				display: flex;
+				align-items: center;
+				gap: 6px;
+				font-size: 0.86rem;
+			}
+			.il {
+				color: var(--mu);
+			}
+			.ivt {
+				color: var(--pc);
+				font-weight: 600;
+				font-size: 0.98rem;
+			}
+			.ivx {
+				color: var(--cc);
+				font-weight: 600;
+			}
+			.ivy {
+				color: var(--sc);
+				font-weight: 600;
+			}
+			.isep {
+				width: 1px;
+				height: 24px;
+				background: var(--border);
+			}
+			/* Controls */
+			.ctrl {
+				display: flex;
+				align-items: center;
+				gap: 10px;
+				margin: 12px auto 0;
+				flex-wrap: wrap;
+				justify-content: center;
+			}
+			button {
+				font-family: "Noto Serif SC", serif;
+				font-size: 0.87rem;
+				padding: 8px 18px;
+				border-radius: 7px;
+				border: 1px solid var(--border2);
+				cursor: pointer;
+				transition: all 0.15s;
+				background: var(--surface);
+				color: var(--tx);
+			}
+			#bpl {
+				background: #1d4ed8;
+				color: #fff;
+				border-color: #2563eb;
+				box-shadow: 0 0 12px rgba(37, 99, 235, 0.28);
+			}
+			#bpl:hover {
+				background: #2563eb;
+			}
+			#brs {
+				color: var(--mu);
+			}
+			#brs:hover {
+				color: var(--tx);
+				border-color: var(--mu);
+			}
+			.csep {
+				width: 1px;
+				height: 26px;
+				background: var(--border);
+			}
+			.tb {
+				display: flex;
+				align-items: center;
+				gap: 6px;
+			}
+			.tb.ts.on {
+				border-color: var(--sc);
+				color: var(--sc);
+			}
+			.tb.tc.on {
+				border-color: var(--cc);
+				color: var(--cc);
+			}
+			.tb.off {
+				opacity: 0.35;
+			}
+			.td {
+				width: 8px;
+				height: 8px;
+				border-radius: 50%;
+			}
+			#bts .td {
+				background: var(--sc);
+			}
+			#btc .td {
+				background: var(--cc);
+			}
+			.tip {
+				font-size: 0.7rem;
+				color: var(--mu);
+				margin-top: 8px;
+				letter-spacing: 0.08em;
+			}
+		</style>
+	</head>
+	<body>
+		<header>
+			<h1>
+				单位圆 · <span class="hs">正弦</span>与<span class="hc"
+					>余弦</span
+				>的几何本质
+			</h1>
+			<!-- <p>拖动 P 点自由探索 · 播放动画演示 · 切换显示 sin / cos</p> -->
+		</header>
+
+		<div class="cw"><canvas id="cv"></canvas></div>
+
+		<div class="dp">
+			<div class="dc ds">
+				<!-- <div class="dct">正弦 Sine</div> -->
+				<div class="dcf">
+					sin(θ) =
+					<span class="fr hy"
+						><span class="fn">对边</span
+						><span class="fd">斜边</span></span
+					>
+					=
+					<span class="fr hy"
+						><span class="fn">y</span
+						><span class="fd">r</span></span
+					>
+					=
+					<span class="fr hy"
+						><span class="fn">y</span
+						><span class="fd">1</span></span
+					>
+					= <span class="hy">y</span>
+				</div>
+				<div class="dcl">
+					<span class="dcll">sin(<span id="tds">0.000</span>) =</span
+					><span class="dclv" id="svv">0.0000</span>
+				</div>
+			</div>
+			<div class="dc dcc">
+				<!-- <div class="dct">余弦 Cosine</div> -->
+				<div class="dcf">
+					cos(θ) =
+					<span class="fr hx"
+						><span class="fn">邻边</span
+						><span class="fd">斜边</span></span
+					>
+					=
+					<span class="fr hx"
+						><span class="fn">x</span
+						><span class="fd">r</span></span
+					>
+					=
+					<span class="fr hx"
+						><span class="fn">x</span
+						><span class="fd">1</span></span
+					>
+					= <span class="hx">x</span>
+				</div>
+				<div class="dcl">
+					<span class="dcll">cos(<span id="tdc">0.000</span>) =</span
+					><span class="dclv" id="cvv">1.0000</span>
+				</div>
+			</div>
+		</div>
+
+		<div class="ctrl">
+			<button id="brs">↺ 重置</button>
+			<button id="bpl">⏸ 暂停</button>
+			<div class="csep"></div>
+			<button id="bts" class="tb ts on">
+				<div class="td"></div>
+				sin
+			</button>
+			<button id="btc" class="tb tc on">
+				<div class="td"></div>
+				cos
+			</button>
+		</div>
+		<!-- <div class="tip">💡 可直接拖动 P 点，松开后动画从该位置继续</div> -->
+
+		<script>
+			const canvas = document.getElementById("cv"),
+				ctx = canvas.getContext("2d");
+			const bpl = document.getElementById("bpl"),
+				brs = document.getElementById("brs");
+			const bts = document.getElementById("bts"),
+				btc = document.getElementById("btc");
+			const svvEl = document.getElementById("svv"),
+				cvvEl = document.getElementById("cvv");
+			const tdsEl = document.getElementById("tds"),
+				tdcEl = document.getElementById("tdc");
+
+			const TAU = Math.PI * 2;
+			const SC = "#22c55e",
+				CC = "#f59e0b",
+				PC = "#fbbf24",
+				TC = "#22d3ee"; // θ / angle color – cyan, distinct from sin & cos
+			const SG = "rgba(34,197,94,.48)",
+				CG = "rgba(245,158,11,.48)",
+				PG = "rgba(251,191,36,.5)",
+				TG = "rgba(34,211,238,.4)";
+			const SD = "rgba(34,197,94,.18)",
+				CD = "rgba(245,158,11,.18)";
+			const AX = "rgba(139,148,158,.5)",
+				MU = "#8b949e",
+				TX = "#e6edf3";
+
+			let angle = 0,
+				paused = false,
+				dragging = false,
+				showS = true,
+				showC = true;
+			const SPEED = 0.01;
+			let W, H, CX, CY, R, pX, pY, pW, pH;
+
+			function resize() {
+				const dpr = window.devicePixelRatio || 1;
+				W = canvas.offsetWidth || document.documentElement.clientWidth;
+				// R purely from width so the vertical layout can be computed from R
+				R = Math.min(W * 0.165, 205);
+				// CY: place center with enough room above for legend / labels (~1.7R)
+				CY = Math.round(R * 1.7 + 14);
+				// H: enough below for the −1 label (CY+R) plus the y-axis overshoot (R*0.2)
+				H = Math.round(CY + R * 1.22 + 10);
+				canvas.style.height = H + "px";
+				CX = W * 0.23;
+				pX = CX + R * 1.55;
+				pY = CY - R;
+				pW = W - pX - R * 0.5;
+				pH = R * 2;
+				canvas.width = Math.round(W * dpr);
+				canvas.height = Math.round(H * dpr);
+				ctx.scale(dpr, dpr);
+			}
+
+			// ── helpers ─────────────────────────────────────────────────────────────────
+
+			function mpos(e) {
+				const r = canvas.getBoundingClientRect(),
+					s = e.touches ? e.touches[0] : e;
+				return { x: s.clientX - r.left, y: s.clientY - r.top };
+			}
+			function angFrom(mx, my) {
+				let a = Math.atan2(-(my - CY), mx - CX);
+				return a < 0 ? a + TAU : a;
+			}
+			function nearP(mx, my) {
+				const px = CX + R * Math.cos(angle),
+					py = CY - R * Math.sin(angle);
+				return Math.hypot(mx - px, my - py) < 24;
+			}
+			function seg(x1, y1, x2, y2, col, w, dash) {
+				ctx.save();
+				ctx.strokeStyle = col;
+				ctx.lineWidth = w || 1.5;
+				if (dash) ctx.setLineDash(dash);
+				ctx.beginPath();
+				ctx.moveTo(x1, y1);
+				ctx.lineTo(x2, y2);
+				ctx.stroke();
+				ctx.setLineDash([]);
+				ctx.restore();
+			}
+			function glow(x, y, r, fill, gc) {
+				ctx.save();
+				if (gc) {
+					ctx.shadowColor = gc;
+					ctx.shadowBlur = 14;
+				}
+				ctx.fillStyle = fill;
+				ctx.beginPath();
+				ctx.arc(x, y, r, 0, TAU);
+				ctx.fill();
+				ctx.shadowBlur = 0;
+				ctx.strokeStyle = "rgba(255,255,255,.2)";
+				ctx.lineWidth = 1.5;
+				ctx.beginPath();
+				ctx.arc(x, y, r + 2.5, 0, TAU);
+				ctx.stroke();
+				ctx.restore();
+			}
+			function t(s, x, y, col, sz, al, bl) {
+				ctx.save();
+				ctx.fillStyle = col;
+				ctx.font = `italic ${sz}px 'Lora',serif`;
+				ctx.textAlign = al || "center";
+				ctx.textBaseline = bl || "middle";
+				ctx.fillText(s, x, y);
+				ctx.restore();
+			}
+			function tn(s, x, y, col, sz, al, bl) {
+				ctx.save();
+				ctx.fillStyle = col;
+				ctx.font = `${sz}px 'Noto Serif SC',serif`;
+				ctx.textAlign = al || "center";
+				ctx.textBaseline = bl || "middle";
+				ctx.fillText(s, x, y);
+				ctx.restore();
+			}
+			// text with semi-transparent background pill
+			function tBg(s, x, y, col, sz, al, bg) {
+				ctx.save();
+				ctx.font = `italic ${sz}px 'Lora',serif`;
+				const w = ctx.measureText(s).width;
+				let bx = x;
+				if (al === "center") bx = x - w / 2;
+				else if (al === "right") bx = x - w;
+				ctx.fillStyle = bg || "rgba(15,20,25,.82)";
+				const pad = 3,
+					rr = 3;
+				const rx = bx - pad,
+					ry = y - sz / 2 - pad,
+					rw = w + pad * 2,
+					rh = sz + pad * 2;
+				ctx.beginPath();
+				ctx.moveTo(rx + rr, ry);
+				ctx.lineTo(rx + rw - rr, ry);
+				ctx.arcTo(rx + rw, ry, rx + rw, ry + rr, rr);
+				ctx.lineTo(rx + rw, ry + rh - rr);
+				ctx.arcTo(rx + rw, ry + rh, rx + rw - rr, ry + rh, rr);
+				ctx.lineTo(rx + rr, ry + rh);
+				ctx.arcTo(rx, ry + rh, rx, ry + rh - rr, rr);
+				ctx.lineTo(rx, ry + rr);
+				ctx.arcTo(rx, ry, rx + rr, ry, rr);
+				ctx.fill();
+				ctx.fillStyle = col;
+				ctx.font = `italic ${sz}px 'Lora',serif`;
+				ctx.textAlign = al || "center";
+				ctx.textBaseline = "middle";
+				ctx.fillText(s, x, y);
+				ctx.restore();
+			}
+
+			// ── circle area ──────────────────────────────────────────────────────────────
+
+			function drawCircle() {
+				const g = ctx.createRadialGradient(
+					CX,
+					CY,
+					R * 0.1,
+					CX,
+					CY,
+					R * 1.75,
+				);
+				g.addColorStop(0, "rgba(96,165,250,.055)");
+				g.addColorStop(1, "transparent");
+				ctx.fillStyle = g;
+				ctx.beginPath();
+				ctx.arc(CX, CY, R * 1.75, 0, TAU);
+				ctx.fill();
+
+				// Circle ring
+				ctx.save();
+				ctx.strokeStyle = "rgba(96,165,250,.5)";
+				ctx.lineWidth = 1.8;
+				ctx.beginPath();
+				ctx.arc(CX, CY, R, 0, TAU);
+				ctx.stroke();
+				ctx.restore();
+
+				const ext = R * 1.28;
+				seg(CX - ext, CY, CX + ext, CY, AX, 1.2);
+				seg(CX, CY - ext, CX, CY + ext, AX, 1.2);
+				const ah = 6,
+					aw = 3;
+				ctx.fillStyle = AX;
+				ctx.beginPath();
+				ctx.moveTo(CX + ext, CY);
+				ctx.lineTo(CX + ext - ah, CY - aw);
+				ctx.lineTo(CX + ext - ah, CY + aw);
+				ctx.fill();
+				ctx.beginPath();
+				ctx.moveTo(CX, CY - ext);
+				ctx.lineTo(CX - aw, CY - ext + ah);
+				ctx.lineTo(CX + aw, CY - ext + ah);
+				ctx.fill();
+
+				const fs = Math.max(10, R * 0.14);
+				// x label: just past arrow tip, not too far right
+				t("x", CX + ext + R * 0.04, CY + R * 0.08, MU, fs);
+				// y label: just below arrow tip, not too high
+				t("y", CX + R * 0.08, CY - ext - R * 0.03, MU, fs);
+
+				// ±1 ticks – offset labels outward so they don't touch circle or axis
+				seg(CX + R, CY - 3.5, CX + R, CY + 3.5, AX, 1);
+				t("+1", CX + R + 5, CY + R * 0.24, MU, Math.max(9, R * 0.13), "left");
+				seg(CX - R, CY - 3.5, CX - R, CY + 3.5, AX, 1);
+				t("−1", CX - R - 5, CY + R * 0.24, MU, Math.max(9, R * 0.13), "right");
+				[
+					[CY - R, "+"],
+					[CY + R, "−"],
+				].forEach(([y, s]) => {
+					seg(CX - 3.5, y, CX + 3.5, y, AX, 1);
+					t(s + "1", CX - R * 0.2, y, MU, Math.max(9, R * 0.13), "right");
+				});
+
+				ctx.fillStyle = MU;
+				ctx.beginPath();
+				ctx.arc(CX, CY, 2.5, 0, TAU);
+				ctx.fill();
+				tn(
+					"单位圆  (r = 1)",
+					CX,
+					CY - R * 1.5,
+					"rgba(96,165,250,.6)",
+					Math.max(11, R * 0.175),
+				);
+			}
+
+			function drawAngleArc() {
+				if (angle < 0.015) return;
+				const aR = R * 0.3;
+				ctx.save();
+				ctx.strokeStyle = TC;
+				ctx.lineWidth = 1.5;
+				ctx.globalAlpha = 0.7;
+				ctx.beginPath();
+				ctx.arc(CX, CY, aR, 0, -angle, true);
+				ctx.stroke();
+				ctx.restore();
+				const mid = -angle / 2;
+				const dist = Math.min(aR * 1.65, R * 0.56);
+				const lx = CX + dist * Math.cos(mid),
+					ly = CY + dist * Math.sin(mid);
+				// Single label: θ = 2.31
+				tBg(
+					"θ = " + angle.toFixed(2),
+					lx,
+					ly,
+					TC,
+					Math.max(11, R * 0.155),
+					"center",
+				);
+			}
+
+			function drawRadius(px, py) {
+				ctx.save();
+				ctx.strokeStyle = "rgba(147,197,253,.75)";
+				ctx.lineWidth = 2.2;
+				ctx.shadowColor = PG;
+				ctx.shadowBlur = 8;
+				ctx.beginPath();
+				ctx.moveTo(CX, CY);
+				ctx.lineTo(px, py);
+				ctx.stroke();
+				ctx.restore();
+			}
+
+			function drawSinProj(px, py) {
+				// Vertical green dashed line: P → x-axis
+				seg(px, py, px, CY, SC, 2, [5, 5]);
+				// Foot dot
+				ctx.fillStyle = SC;
+				ctx.beginPath();
+				ctx.arc(px, CY, 3, 0, TAU);
+				ctx.fill();
+			}
+
+			function drawCosProj(px, py) {
+				// Horizontal orange dashed line: P → y-axis
+				seg(px, py, CX, py, CC, 2, [5, 5]);
+				ctx.fillStyle = CC;
+				ctx.beginPath();
+				ctx.arc(CX, py, 3, 0, TAU);
+				ctx.fill();
+			}
+
+			function drawPLabel(px, py, cv, sv) {
+				const fs = Math.max(10, R * 0.15);
+				const offX = cv >= 0 ? 14 : -14;
+				const offY = sv >= 0 ? -20 : 20;
+				const align = cv >= 0 ? "left" : "right";
+
+				let parts;
+				if (showS && showC) {
+					parts = [["P(", TX], [cv.toFixed(2), CC], [", ", MU], [sv.toFixed(2), SC], [")", TX]];
+				} else if (showS) {
+					parts = [["P(  , ", TX], [sv.toFixed(2), SC], [")", TX]];
+				} else {
+					parts = [["P(", TX], [cv.toFixed(2), CC], [",  )", MU]];
+				}
+				ctx.save();
+				ctx.font = `italic ${fs}px 'Lora',serif`;
+				let total = 0;
+				parts.forEach(([s]) => {
+					total += ctx.measureText(s).width;
+				});
+				const bx = cv >= 0 ? px + offX : px + offX - total;
+				const by = py + offY - fs / 2 - 3;
+				// Background pill
+				ctx.fillStyle = "rgba(15,20,25,.88)";
+				const bw = total + 10,
+					bh = fs + 8,
+					br = 4;
+				ctx.beginPath();
+				ctx.moveTo(bx - 5 + br, by - 2);
+				ctx.arcTo(bx - 5 + bw, by - 2, bx - 5 + bw, by - 2 + bh, br);
+				ctx.arcTo(bx - 5 + bw, by - 2 + bh, bx - 5, by - 2 + bh, br);
+				ctx.arcTo(bx - 5, by - 2 + bh, bx - 5, by - 2, br);
+				ctx.arcTo(bx - 5, by - 2, bx - 5 + bw, by - 2, br);
+				ctx.fill();
+				ctx.font = `italic ${fs}px 'Lora',serif`;
+				ctx.textBaseline = "top";
+				let cx2 = bx;
+				parts.forEach(([s, col]) => {
+					ctx.fillStyle = col;
+					ctx.fillText(s, cx2, by);
+					cx2 += ctx.measureText(s).width;
+				});
+				ctx.restore();
+			}
+
+			// ── plot area ────────────────────────────────────────────────────────────────
+
+			function drawPlotAxes() {
+				// Subtle horizontal grid at ±1, ±0.5, 0
+				[R, R * 0.5, 0, -R * 0.5, -R].forEach((dy) => {
+					const y = CY - dy;
+					seg(pX, y, pX + pW, y, "rgba(33,38,45,.8)", 0.8);
+				});
+
+				// Y axis
+				seg(pX, pY - R * 0.18, pX, pY + pH + R * 0.18, AX, 1.2);
+				// X axis
+				seg(pX - 5, CY, pX + pW + 8, CY, AX, 1.2);
+				// Arrow right
+				ctx.fillStyle = AX;
+				ctx.beginPath();
+				ctx.moveTo(pX + pW + 8, CY);
+				ctx.lineTo(pX + pW + 2, CY - 4);
+				ctx.lineTo(pX + pW + 2, CY + 4);
+				ctx.fill();
+
+				const fs = Math.max(10, R * 0.15);
+				// Key angle ticks + labels
+				const angs = [0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2, TAU];
+				const labs = ["0", "π/2", "π", "3π/2", "2π"];
+				angs.forEach((a, i) => {
+					const x = pX + (a / TAU) * pW;
+					seg(x, CY - 4, x, CY + 4, AX, 1);
+					// right-align the last label (2π) so it doesn't extend beyond the plot
+					t(
+						labs[i],
+						x,
+						CY + R * 0.22,
+						MU,
+						fs,
+						i === angs.length - 1 ? "right" : "center",
+					);
+					if (i > 0)
+						seg(
+							x,
+							pY - R * 0.12,
+							x,
+							pY + pH + R * 0.12,
+							"rgba(33,38,45,.95)",
+							0.8,
+							[3, 6],
+						);
+				});
+
+				// Y axis labels
+				[
+					[CY - R, "+1"],
+					[CY + R, "−1"],
+				].forEach(([y, l]) => {
+					seg(pX - 4, y, pX + 4, y, AX, 1);
+					t(l, pX - 8, y, MU, fs, "right");
+				});
+
+				// θ label after the x-axis arrow (italic, at axis level, no "rad" text)
+				ctx.save();
+				ctx.fillStyle = MU;
+				ctx.font = `italic ${Math.max(11, fs * 1.1)}px 'Lora',serif`;
+				ctx.textAlign = "left";
+				ctx.textBaseline = "middle";
+				ctx.fillText("θ", pX + pW + R * 0.1, CY);
+				ctx.restore();
+
+				// Legend – near y-axis at +1 mark, stacked vertically
+				const fs2 = Math.max(11, R * 0.17),
+					dotR = 5,
+					lgPad = 7;
+				const lgItems = [];
+				if (showS) lgItems.push({ col: SC, label: "y = sinθ" });
+				if (showC) lgItems.push({ col: CC, label: "y = cosθ" });
+				if (lgItems.length) {
+					ctx.save();
+					ctx.font = `${fs2}px 'Lora',serif`;
+					const maxW = Math.max(
+						...lgItems.map(
+							({ label: l }) => ctx.measureText(l).width,
+						),
+					);
+					const rowH = fs2 * 1.75;
+					// Position: just right of y-axis, slightly above +1 mark
+					const lbx = pX + lgPad,
+						lby = CY - R - R * 0.28 - rowH * lgItems.length * 0.5;
+					const bgW = dotR * 2 + lgPad + maxW + lgPad,
+						bgH = rowH * lgItems.length + lgPad;
+					ctx.fillStyle = "rgba(15,20,25,.8)";
+					ctx.fillRect(lbx, lby - lgPad * 0.5, bgW, bgH);
+					lgItems.forEach(({ col, label }, i) => {
+						const cy2 = lby + i * rowH + rowH * 0.35;
+						ctx.fillStyle = col;
+						ctx.beginPath();
+						ctx.arc(lbx + lgPad + dotR, cy2, dotR, 0, TAU);
+						ctx.fill();
+						ctx.fillStyle = col;
+						ctx.textAlign = "left";
+						ctx.textBaseline = "middle";
+						ctx.fillText(label, lbx + lgPad + dotR * 2 + 5, cy2);
+					});
+					ctx.restore();
+				}
+			}
+
+			function drawCurve(fn, bright, dim) {
+				const N = 500;
+				// Faded full curve
+				ctx.save();
+				ctx.strokeStyle = dim;
+				ctx.lineWidth = 1.5;
+				ctx.beginPath();
+				for (let i = 0; i <= N; i++) {
+					const a = (i / N) * TAU,
+						x = pX + (a / TAU) * pW,
+						y = CY - fn(a) * R;
+					i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+				}
+				ctx.stroke();
+				// Bright portion 0 → angle
+				const cur = Math.round((angle / TAU) * N);
+				if (cur > 0) {
+					ctx.strokeStyle = bright;
+					ctx.lineWidth = 2.7;
+					ctx.shadowColor = bright;
+					ctx.shadowBlur = 6;
+					ctx.beginPath();
+					for (let i = 0; i <= cur; i++) {
+						const a = (i / N) * TAU,
+							x = pX + (a / TAU) * pW,
+							y = CY - fn(a) * R;
+						i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+					}
+					ctx.stroke();
+					ctx.shadowBlur = 0;
+				}
+				ctx.restore();
+			}
+
+			function drawCurrentMarkers(sx, spy, cpy, sv, cv) {
+				if (!showS && !showC) return;
+				const fs = Math.max(10, R * 0.148);
+				const fsm = Math.max(9, R * 0.132);
+
+				// ── 1. Cyan θ progress – highlight the x-axis itself ────────────────────
+				if (angle > 0.01) {
+					// Overlay the x-axis with cyan from origin to current θ position
+					ctx.save();
+					ctx.strokeStyle = TC;
+					ctx.lineWidth = 3.5;
+					ctx.lineCap = "round";
+					ctx.shadowColor = TG;
+					ctx.shadowBlur = 10;
+					ctx.beginPath();
+					ctx.moveTo(pX, CY);
+					ctx.lineTo(sx, CY);
+					ctx.stroke();
+					ctx.shadowBlur = 0;
+					ctx.restore();
+					// Glowing end-point dot ON the x-axis
+					ctx.save();
+					ctx.fillStyle = TC;
+					ctx.shadowColor = TG;
+					ctx.shadowBlur = 10;
+					ctx.beginPath();
+					ctx.arc(sx, CY, 5.5, 0, TAU);
+					ctx.fill();
+					ctx.shadowBlur = 0;
+					ctx.restore();
+					// θ label at midpoint of the segment, below axis
+					tBg(
+						"θ = " + angle.toFixed(2),
+						(pX + sx) / 2,
+						CY + R * 0.18,
+						TC,
+						fsm,
+						"center",
+					);
+				}
+
+				// ── 2. Prominent white vertical drop line curve → x-axis ─────────────────
+				const pts = [];
+				if (showS) pts.push(spy);
+				if (showC) pts.push(cpy);
+				const topY = Math.min(...pts);
+				ctx.save();
+				ctx.strokeStyle = "rgba(255,255,255,.6)";
+				ctx.lineWidth = 2;
+				ctx.setLineDash([9, 5]);
+				ctx.beginPath();
+				ctx.moveTo(sx, topY - 3);
+				ctx.lineTo(sx, CY - 7);
+				ctx.stroke();
+				ctx.setLineDash([]);
+				ctx.restore();
+
+				// ── 3. y-value labels – sin right, cos left ──────────────────────────────
+				if (showS)
+					tBg("y = " + sv.toFixed(2), sx + 12, spy, SC, fs, "left");
+				if (showC)
+					tBg("y = " + cv.toFixed(2), sx - 12, cpy, CC, fs, "right");
+			}
+
+			// ── main draw ────────────────────────────────────────────────────────────────
+
+			function draw() {
+				ctx.clearRect(0, 0, W, H);
+				const sv = Math.sin(angle),
+					cv = Math.cos(angle);
+				const px = CX + R * cv,
+					py = CY - R * sv;
+				const sx = pX + (angle / TAU) * pW;
+				const spy = CY - sv * R,
+					cpy = CY - cv * R;
+
+				// ── left: unit circle ──
+				drawCircle();
+				drawAngleArc();
+				drawRadius(px, py);
+				if (showS) drawSinProj(px, py);
+				if (showC) drawCosProj(px, py);
+				// P last (on top)
+				glow(px, py, 8, PC, PG);
+				drawPLabel(px, py, cv, sv);
+
+				// ── right: plot ──
+				drawPlotAxes();
+				if (showC) drawCurve(Math.cos, CC, CD);
+				if (showS) drawCurve(Math.sin, SC, SD);
+
+				// Bridge lines
+				if (showS) {
+					// horizontal bridge (same y-level)
+					seg(px, spy, sx, spy, "rgba(34,197,94,.35)", 1.5, [4, 5]);
+				}
+				if (showC) {
+					// angled bridge
+					seg(px, py, sx, cpy, "rgba(245,158,11,.35)", 1.5, [4, 5]);
+				}
+
+				// Current dots on curves
+				if (showS) glow(sx, spy, 6, SC, SG);
+				if (showC) glow(sx, cpy, 6, CC, CG);
+
+				// Dynamic markers (vertical drop + labels)
+				drawCurrentMarkers(sx, spy, cpy, sv, cv);
+
+				// Completion — placed inside the upper plot area
+				if (angle >= TAU * 0.999) {
+					tn(
+						"一个完整周期 ✓",
+						pX + pW / 2,
+						pY + R * 0.4,
+						SC,
+						Math.max(12, R * 0.195),
+					);
+				}
+
+				// DOM update
+				const ts = angle.toFixed(2);
+				tdsEl.textContent = ts;
+				tdcEl.textContent = ts;
+				svvEl.textContent = sv.toFixed(2);
+				cvvEl.textContent = cv.toFixed(2);
+			}
+
+			// ── loop ────────────────────────────────────────────────────────────────────
+
+			function loop() {
+				if (!paused && !dragging) {
+					if (angle < TAU) {
+						angle += SPEED;
+						if (angle > TAU) angle = TAU;
+					} else {
+						paused = true;
+						bpl.textContent = "▶ 播放";
+					}
+				}
+				draw();
+				requestAnimationFrame(loop);
+			}
+
+			// ── events ──────────────────────────────────────────────────────────────────
+
+			canvas.addEventListener("mousedown", (e) => {
+				const { x, y } = mpos(e);
+				if (nearP(x, y)) {
+					dragging = true;
+					canvas.style.cursor = "grabbing";
+				}
+			});
+			canvas.addEventListener("mousemove", (e) => {
+				const { x, y } = mpos(e);
+				if (dragging) {
+					angle = angFrom(x, y);
+				} else {
+					canvas.style.cursor = nearP(x, y) ? "grab" : "default";
+				}
+			});
+			const endDrag = () => {
+				dragging = false;
+				canvas.style.cursor = "default";
+			};
+			canvas.addEventListener("mouseup", endDrag);
+			canvas.addEventListener("mouseleave", endDrag);
+			canvas.addEventListener(
+				"touchstart",
+				(e) => {
+					e.preventDefault();
+					const { x, y } = mpos(e);
+					if (nearP(x, y)) dragging = true;
+				},
+				{ passive: false },
+			);
+			canvas.addEventListener(
+				"touchmove",
+				(e) => {
+					e.preventDefault();
+					if (dragging) {
+						const { x, y } = mpos(e);
+						angle = angFrom(x, y);
+					}
+				},
+				{ passive: false },
+			);
+			canvas.addEventListener("touchend", () => {
+				dragging = false;
+			});
+
+			bpl.addEventListener("click", () => {
+				if (angle >= TAU) {
+					angle = 0;
+					paused = false;
+					bpl.textContent = "⏸ 暂停";
+				} else {
+					paused = !paused;
+					bpl.textContent = paused ? "▶ 播放" : "⏸ 暂停";
+				}
+			});
+			brs.addEventListener("click", () => {
+				angle = 0;
+				paused = false;
+				bpl.textContent = "⏸ 暂停";
+			});
+			function updateCards() {
+				const sinCard = document.querySelector(".dc.ds");
+				const cosCard = document.querySelector(".dc.dcc");
+				const dp = document.querySelector(".dp");
+				sinCard.style.display = showS ? "" : "none";
+				cosCard.style.display = showC ? "" : "none";
+				if (showS && showC) {
+					dp.style.gridTemplateColumns = "1fr 1fr";
+					dp.style.maxWidth = "1100px";
+					dp.style.margin = "0 auto";
+				} else {
+					dp.style.gridTemplateColumns = "1fr";
+					dp.style.maxWidth = "520px";
+					dp.style.margin = "0 auto";
+				}
+			}
+
+			bts.addEventListener("click", () => {
+				showS = !showS;
+				bts.className = "tb ts " + (showS ? "on" : "off");
+				updateCards();
+			});
+			btc.addEventListener("click", () => {
+				showC = !showC;
+				btc.className = "tb tc " + (showC ? "on" : "off");
+				updateCards();
+			});
+			window.addEventListener("resize", resize);
+
+			resize();
+			updateCards();
+			loop();
+		</script>
+	</body>
+</html>

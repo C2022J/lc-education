@@ -45,20 +45,25 @@ async def execute_rag_search(query: str, top_k: int = 2) -> List[str]:
 
         # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 调试：打印重排前后的信息 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         print(f"    🎯 [RAG] Reranker 重排开始...")
+        import re as regex
         for idx, (res, score) in enumerate(zip(results, scores), 1):
-            doc_content = res[0].page_content
-            content_preview = doc_content[:100] + "..." if len(doc_content) > 100 else doc_content
+            doc = res[0]
+            doc_content = doc.page_content
+            meta = doc.metadata
             print(f"       [{idx}] 相关度得分: {score:.4f}")
             print(f"            内容长度: {len(doc_content)} 字符")
-            print(f"            预览: {content_preview}")
-            
-            # 检查是否包含图片链接
-            import re as regex
+            print(f"            来源文件: {meta.get('source_file', '?')}")
+            print(f"            题目标题: {meta.get('question_title', '?')}")
+            stored_img_urls = meta.get('image_urls', '[]')
+            print(f"            元数据图片URLs: {stored_img_urls}")
             img_links = regex.findall(r'!\[.*?\]\((.*?)\)', doc_content)
+            print(f"            正文内图片数: {len(img_links)}")
             if img_links:
-                print(f"            📸 包含 {len(img_links)} 个图片链接:")
                 for img_idx, img_link in enumerate(img_links, 1):
-                    print(f"               - {img_link}")
+                    print(f"               [{img_idx}] {img_link}")
+            print(f"            ── 完整内容 ──")
+            print(doc_content)
+            print(f"            ── 内容结束 ──")
 
         # 3. 排序并截取
         reranked_results = sorted(zip(results, scores), key=lambda x: x[1], reverse=True)
@@ -67,9 +72,8 @@ async def execute_rag_search(query: str, top_k: int = 2) -> List[str]:
         print(f"    🏆 [RAG] 精排后返回前 {top_k} 条高优内容:")
         final_docs = [res[0][0].page_content for res in reranked_results[:top_k]]
         for idx, doc in enumerate(final_docs, 1):
-            doc_preview = doc[:150] + "..." if len(doc) > 150 else doc
             print(f"       [{idx}] 长度 {len(doc)} 字符")
-            print(f"            {doc_preview}")
+            print(doc)
 
         return final_docs
 

@@ -3,18 +3,34 @@ import os
 from pathlib import Path
 from langchain_core.tools import tool
 
-# 预设的 LaTeX 导言区（包含了所有必须的数学、排版宏包，大模型不需要管这些）
-LATEX_PREAMBLE = r"""\documentclass[12pt,a4paper]{ctexart}
+# ── A4 paper (standard) ──────────────────────────────────────────────────────
+PREAMBLE_A4 = r"""\documentclass[12pt,a4paper]{ctexart}
 \usepackage{geometry}
-\geometry{margin=1in}
+\geometry{top=2.5cm,bottom=2.5cm,left=3cm,right=3cm}
 \usepackage{amsmath,amssymb}
 \usepackage{graphicx}
 \usepackage{enumitem}
 \everymath{\displaystyle}
 \setlength{\parindent}{0pt}
-
+\setlength{\parskip}{0.2em}
 \begin{document}
 """
+
+# ── 试卷纸 (8K exam paper, 26×36.85 cm) ─────────────────────────────────────
+PREAMBLE_EXAM = r"""\documentclass[11pt]{ctexart}
+\usepackage{geometry}
+\geometry{paperwidth=26cm,paperheight=36.85cm,top=2cm,bottom=2cm,left=2.5cm,right=2.5cm}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{enumitem}
+\everymath{\displaystyle}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.15em}
+\begin{document}
+"""
+
+# Legacy alias kept for the tool below
+LATEX_PREAMBLE = PREAMBLE_A4
 
 LATEX_POSTAMBLE = r"""
 \end{document}

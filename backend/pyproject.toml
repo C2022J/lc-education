@@ -8,6 +8,7 @@ dependencies = [
     "fastapi>=0.136.1",
     "google-genai>=1.74.0",
     "langchain-chroma>=1.1.0",
+    "langchain-deepseek>=1.0.1",
     "langchain-google-genai>=4.2.2",
     "langchain-huggingface>=1.2.2",
     "langchain-openai>=1.2.1",
